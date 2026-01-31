@@ -38,7 +38,7 @@ const state = updateState({
 state.getId()
 ```
 
-### Pattern
+## 🧠 Pattern
 
 Each override layers on top of the previous implementation:
 
