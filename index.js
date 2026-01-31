@@ -1,4 +1,4 @@
-const createStore = defaultState => ({
+const createStore = (defaultState = {}) => ({
     getState: () => defaultState,
     updateState: initializeState(defaultState)
 })
@@ -25,19 +25,19 @@ function initializeState(state) {
 }
 
 const store = createStore({
-    getId() {
-        return this.id
+    method() {
+        const list = []
+        for (let i = 0; i < 5000; i++) list.push(list[i])
+    }
+})
+
+store.updateState({
+    method(prevFn) {
+        console.time()
+        prevFn()
+        console.timeEnd()
     }
 })
 
 const state = store.getState()
-
-store.updateState({
-    id: 1,
-    getId(prevFn) {
-        const result = prevFn()
-        console.log(result)
-    }
-})
-
-state.getId()
+state.method()
