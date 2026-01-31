@@ -22,10 +22,11 @@ const updateState = createState({
 })
 
 const state = updateState({
-    id: 1,
-    getId(a, prevFn, b) {
-        console.log(a, prevFn, b)
+    id: Math.random() * 9,
+    getId(prevFn) {
+        const result = Math.floor(prevFn())
+        console.log(result)
     }
 })
 
-state.getId(1, 2)
+state.getId()
