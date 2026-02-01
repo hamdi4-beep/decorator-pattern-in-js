@@ -1,10 +1,3 @@
-function decorator(wrapper, prevFn, state) {
-    return function(...args) {
-        prevFn = prevFn.bind(state)
-        return wrapper.apply(state, [...args, prevFn])
-    }
-}
-
 const createStore = (defaultState = {}) => ({
     getState: () => defaultState,
     updateState: initializeState(defaultState)
@@ -14,26 +7,31 @@ function initializeState(state) {
     return props => {
         for (const key in props)
             state[key] = typeof state[key] === 'function' && key in state ?
-                decorator(props[key], state[key], state) : props[key]
+                ((prevFn, currFn) => {
+                    return function(...args) {
+                        prevFn = prevFn.bind(state)
+                        return currFn.apply(state, args.concat(prevFn))
+                    }
+                })(state[key], props[key]) : props[key]
 
         return state
     }
 }
 
 const store = createStore({
-    createList() {
+    createList(n) {
         const list = []
-        for (let i = 0; i < 5000; i++) list.push(list[i])
+        for (let i = 0; i < n; i++) list.push(list[i])
     }
 })
 
 store.updateState({
-    createList(prevFn) {
+    createList(n, prevFn) {
         console.time('timing')
-        prevFn()
+        prevFn(n)
         console.timeEnd('timing')
     }
 })
 
 const state = store.getState()
-state.createList()
+state.createList(10000)
