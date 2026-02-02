@@ -1,22 +1,24 @@
-const createApi = (defaultState = {}) => ({
-    getState: () => defaultState,
-    updateState: createState(defaultState)
-})
+const createApi = (defaultState = {}) => {
+    const createState = state =>
+        props => {
+            for (const key in props) {
+                state[key] = typeof props[key] === 'function' && typeof state[key] === 'function' ?
+                    (function(prevFn, currFn) {
+                        prevFn = prevFn.bind(state)
 
-const createState = state =>
-    props => {
-        for (const key in props) {
-            state[key] = typeof props[key] === 'function' && typeof state[key] === 'function' ?
-                (function(prevFn, currFn) {
-                    prevFn = prevFn.bind(state)
-
-                    return function(...args) {
-                        if (currFn.length > args.length) args[currFn.length - 1] = prevFn
-                        return currFn.apply(state, args)
-                    }
-                })(state[key], props[key]) : props[key]
+                        return function(...args) {
+                            if (currFn.length > args.length) args[currFn.length - 1] = prevFn
+                            return currFn.apply(state, args)
+                        }
+                    })(state[key], props[key]) : props[key]
+            }
         }
+
+    return {
+        getState: () => defaultState,
+        updateState: createState(defaultState)
     }
+}
 
 const api = createApi({
     // using an example that generates a random number so I can verify the function returns the same cached result
