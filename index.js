@@ -1,6 +1,4 @@
-const createApi = (state = {}) => {
-
-    return {
+const createApi = (state = {}) => ({
         getState: () => state,
         updateState(props) {
             for (const key in props) {
@@ -15,8 +13,7 @@ const createApi = (state = {}) => {
                     })(state[key], props[key]) : props[key]
             }
         }
-    }
-}
+    })
 
 const api = createApi({
     // using an example that generates a random number so I can verify the function returns the same cached result
