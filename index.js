@@ -21,16 +21,18 @@ const createState = state =>
     }
 
 const store = createStore({
+    // using an example that generates a random number so I can verify the function returns the same cached result
     generateRandomNumber() {
         return Math.floor(Math.random() * 9)
     }
 })
 
 store.updateState({
+    // overrides the method with a different implementation that has access to the older method
+    // here we can extend behavior with things like monitoring or caching without bloating the original method
     generateRandomNumber(prevFn) {
-        if (!prevFn.cached) prevFn.cached = {}
-        if (!prevFn.cached['result']) prevFn.cached['result'] = prevFn()
-        console.log(prevFn.cached['result'])
+        if (!prevFn.cachedResult) prevFn.cachedResult = prevFn()
+        console.log(prevFn.cachedResult)
     }
 })
 
