@@ -1,28 +1,28 @@
-# State Store with Method Composition
+# Method Composition API
 
-A proof-of-concept state management system that allows method overriding while preserving access to previous implementations.
+A proof-of-concept API that allows method overriding while preserving access to previous implementations.
 
 ## How It Works
 
-The store detects when you're replacing a function property with another function. When this happens, it automatically wraps both functions so the new implementation can access the previous one as its last parameter.
+The API detects when you're replacing a function property with another function. When this happens, it automatically wraps both functions so the new implementation can access the previous one as its last parameter.
 
 **Key mechanism:** 
-- Previous function is bound to the state object
+- Previous function is bound to the API's internal state
 - Injected as the last argument only if the new function expects more parameters than provided
 - Creates a composition chain where each override can call its predecessor
 
 ## Usage
 
 ```javascript
-// Create a store with initial state
-const store = createStore({
+// Create an API with initial methods
+const api = createApi({
     methodName() {
         // original implementation
     }
 })
 
 // Override methods while accessing previous implementation
-store.updateState({
+api.updateState({
     methodName(prevFn) {
         // your decorator logic here
         const result = prevFn() // call original
@@ -31,8 +31,8 @@ store.updateState({
     }
 })
 
-// Access state and call methods
-const state = store.getState()
+// Access the API and call methods
+const state = api.getState()
 state.methodName()
 ```
 
@@ -41,33 +41,33 @@ state.methodName()
 ### Caching Results
 
 ```javascript
-const store = createStore({
+const api = createApi({
     generateRandomNumber() {
         return Math.floor(Math.random() * 9)
     }
 })
 
-store.updateState({
+api.updateState({
     generateRandomNumber(prevFn) {
         if (!prevFn.cachedResult) prevFn.cachedResult = prevFn()
         return prevFn.cachedResult
     }
 })
 
-const state = store.getState()
+const state = api.getState()
 console.log(state.generateRandomNumber()) // Always returns same number
 ```
 
 ### Performance Monitoring
 
 ```javascript
-const store = createStore({
+const api = createApi({
     processData(data) {
         return data.map(x => x * 2).filter(x => x > 10)
     }
 })
 
-store.updateState({
+api.updateState({
     processData(data, prevFn) {
         const start = performance.now()
         const result = prevFn(data)
@@ -81,7 +81,7 @@ store.updateState({
 ### Error Handling and Retry Logic
 
 ```javascript
-const store = createStore({
+const api = createApi({
     fetchUserData(userId) {
         // simulate API call that might fail
         if (Math.random() > 0.7) throw new Error('Network error')
@@ -89,7 +89,7 @@ const store = createStore({
     }
 })
 
-store.updateState({
+api.updateState({
     fetchUserData(userId, prevFn) {
         let attempts = 0
         const maxRetries = 3
@@ -110,14 +110,14 @@ store.updateState({
 ### Request Throttling
 
 ```javascript
-const store = createStore({
+const api = createApi({
     saveData(data) {
         console.log('Saving:', data)
         return { saved: true }
     }
 })
 
-store.updateState({
+api.updateState({
     saveData(data, prevFn) {
         const now = Date.now()
         if (!prevFn.lastCall || now - prevFn.lastCall > 1000) {
@@ -133,13 +133,13 @@ store.updateState({
 ### Input Validation
 
 ```javascript
-const store = createStore({
+const api = createApi({
     createUser(userData) {
         return { id: Date.now(), ...userData }
     }
 })
 
-store.updateState({
+api.updateState({
     createUser(userData, prevFn) {
         if (!userData.email || !userData.name) {
             throw new Error('Email and name are required')
