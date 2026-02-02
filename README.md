@@ -1,57 +1,161 @@
-# Layered State Methods (Function Override Pattern)
+# State Store with Method Composition
 
-This repo demonstrates a simple pattern for overriding object methods while retaining access to their previous implementations using closures.
+A proof-of-concept state management system that allows method overriding while preserving access to previous implementations.
 
-Instead of replacing functions directly, each override wraps the previous one, allowing behavior to be extended safely — similar to decorators or middleware systems.
+## How It Works
 
----
+The store detects when you're replacing a function property with another function. When this happens, it automatically wraps both functions so the new implementation can access the previous one as its last parameter.
 
-## 📦 Usage
+**Key mechanism:** 
+- Previous function is bound to the state object
+- Injected as the last argument only if the new function expects more parameters than provided
+- Creates a composition chain where each override can call its predecessor
 
-### 1. Create the initial state
+## Usage
 
-```js
-const updateState = createState({
-  getId() {
-    return this.id
-  }
+```javascript
+// Create a store with initial state
+const store = createStore({
+    methodName() {
+        // original implementation
+    }
+})
+
+// Override methods while accessing previous implementation
+store.updateState({
+    methodName(prevFn) {
+        // your decorator logic here
+        const result = prevFn() // call original
+        // additional logic
+        return result
+    }
+})
+
+// Access state and call methods
+const state = store.getState()
+state.methodName()
+```
+
+## Examples
+
+### Caching Results
+
+```javascript
+const store = createStore({
+    generateRandomNumber() {
+        return Math.floor(Math.random() * 9)
+    }
+})
+
+store.updateState({
+    generateRandomNumber(prevFn) {
+        if (!prevFn.cachedResult) prevFn.cachedResult = prevFn()
+        return prevFn.cachedResult
+    }
+})
+
+const state = store.getState()
+console.log(state.generateRandomNumber()) // Always returns same number
+```
+
+### Performance Monitoring
+
+```javascript
+const store = createStore({
+    processData(data) {
+        return data.map(x => x * 2).filter(x => x > 10)
+    }
+})
+
+store.updateState({
+    processData(data, prevFn) {
+        const start = performance.now()
+        const result = prevFn(data)
+        const duration = performance.now() - start
+        console.log(`processData took ${duration}ms`)
+        return result
+    }
 })
 ```
 
-### 2. Override while keeping access to the previous implementation
+### Error Handling and Retry Logic
 
-If the new method accepts more than one parameter, the previous implementation is automatically injected as the last argument.
+```javascript
+const store = createStore({
+    fetchUserData(userId) {
+        // simulate API call that might fail
+        if (Math.random() > 0.7) throw new Error('Network error')
+        return { id: userId, name: 'User' }
+    }
+})
 
-```js
-const state = updateState({
-  id: Math.random() * 9,
-  getId(prevFn) {
-    const result = Math.floor(prevFn())
-    console.log(result)
-  }
+store.updateState({
+    fetchUserData(userId, prevFn) {
+        let attempts = 0
+        const maxRetries = 3
+        
+        while (attempts < maxRetries) {
+            try {
+                return prevFn(userId)
+            } catch (error) {
+                attempts++
+                console.log(`Attempt ${attempts} failed`)
+                if (attempts === maxRetries) throw error
+            }
+        }
+    }
 })
 ```
 
-### 3. Call the method normally
+### Request Throttling
 
-```js
-state.getId()
+```javascript
+const store = createStore({
+    saveData(data) {
+        console.log('Saving:', data)
+        return { saved: true }
+    }
+})
+
+store.updateState({
+    saveData(data, prevFn) {
+        const now = Date.now()
+        if (!prevFn.lastCall || now - prevFn.lastCall > 1000) {
+            prevFn.lastCall = now
+            return prevFn(data)
+        }
+        console.log('Request throttled')
+        return { saved: false }
+    }
+})
 ```
 
-## 🧠 Pattern
+### Input Validation
 
-Each override layers on top of the previous implementation:
+```javascript
+const store = createStore({
+    createUser(userData) {
+        return { id: Date.now(), ...userData }
+    }
+})
 
-```nginx
-newMethod → oldMethod → olderMethod → ...
+store.updateState({
+    createUser(userData, prevFn) {
+        if (!userData.email || !userData.name) {
+            throw new Error('Email and name are required')
+        }
+        if (!userData.email.includes('@')) {
+            throw new Error('Invalid email format')
+        }
+        return prevFn(userData)
+    }
+})
 ```
 
-This enables:
+## Benefits
 
-- Behavior composition
-
-- Safe method extension
-
-- Function chaining
-
-- Plugin/middleware-style logic
+The decorator pattern separates concerns:
+- Original methods focus on core logic
+- Decorators add cross-cutting concerns (logging, caching, validation)
+- No need to modify original implementations
+- Stack multiple decorators by calling `updateState` multiple times
