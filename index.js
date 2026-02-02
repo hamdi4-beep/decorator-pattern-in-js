@@ -1,37 +1,42 @@
 const createStore = (defaultState = {}) => ({
     getState: () => defaultState,
-    updateState: initializeState(defaultState)
+    updateState: createState(defaultState)
 })
 
-function initializeState(state) {
-    return props => {
-        for (const key in props)
-            state[key] = typeof state[key] === 'function' && key in state ?
-                ((prevFn, currFn) => {
+const createState = state =>
+    props => {
+        for (const key in props) {
+            state[key] = typeof props[key] === 'function' && typeof state[key] === 'function' ?
+                (function(prevFn, currFn) {
+                    prevFn = prevFn.bind(state)
+
                     return function(...args) {
-                        prevFn = prevFn.bind(state)
-                        return currFn.apply(state, args.concat(prevFn))
+                        if (currFn.length > args.length) args[currFn.length - 1] = prevFn
+                        return currFn.apply(state, args)
                     }
                 })(state[key], props[key]) : props[key]
+        }
 
         return state
     }
-}
 
 const store = createStore({
-    createList(n) {
-        const list = []
-        for (let i = 0; i < n; i++) list.push(list[i])
+    generateRandomNumber() {
+        return Math.floor(Math.random() * 9)
     }
 })
 
 store.updateState({
-    createList(n, prevFn) {
-        console.time('timing')
-        prevFn(n)
-        console.timeEnd('timing')
+    generateRandomNumber(prevFn) {
+        if (!prevFn.cached) prevFn.cached = {}
+        if (!prevFn.cached['result']) prevFn.cached['result'] = prevFn()
+        console.log(prevFn.cached['result'])
     }
 })
 
 const state = store.getState()
-state.createList(10000)
+
+state.generateRandomNumber()
+state.generateRandomNumber()
+state.generateRandomNumber()
+state.generateRandomNumber()
