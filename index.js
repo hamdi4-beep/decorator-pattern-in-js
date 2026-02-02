@@ -1,4 +1,4 @@
-const createStore = (defaultState = {}) => ({
+const createApi = (defaultState = {}) => ({
     getState: () => defaultState,
     updateState: createState(defaultState)
 })
@@ -16,18 +16,16 @@ const createState = state =>
                     }
                 })(state[key], props[key]) : props[key]
         }
-
-        return state
     }
 
-const store = createStore({
+const api = createApi({
     // using an example that generates a random number so I can verify the function returns the same cached result
     generateRandomNumber() {
         return Math.floor(Math.random() * 9)
     }
 })
 
-store.updateState({
+api.updateState({
     // overrides the method with a different implementation that has access to the older method
     // here we can extend behavior with things like monitoring or caching without bloating the original method
     generateRandomNumber(prevFn) {
@@ -36,7 +34,7 @@ store.updateState({
     }
 })
 
-const state = store.getState()
+const state = api.getState()
 
 state.generateRandomNumber()
 state.generateRandomNumber()
