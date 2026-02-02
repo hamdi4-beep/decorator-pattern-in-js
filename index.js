@@ -1,6 +1,8 @@
-const createApi = (defaultState = {}) => {
-    const initializeState = state =>
-        props => {
+const createApi = (state = {}) => {
+
+    return {
+        getState: () => state,
+        updateState(props) {
             for (const key in props) {
                 state[key] = typeof props[key] === 'function' && typeof state[key] === 'function' ?
                     (function(prevFn, currFn) {
@@ -13,10 +15,6 @@ const createApi = (defaultState = {}) => {
                     })(state[key], props[key]) : props[key]
             }
         }
-
-    return {
-        getState: () => defaultState,
-        updateState: initializeState(defaultState)
     }
 }
 
