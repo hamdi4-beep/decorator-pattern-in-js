@@ -1,39 +1,41 @@
-const createApi = (state = {}) => ({
+const createApi = (state = {}) => {
+    let layers = 0
+
+    return {
+        getLayers: () => layers,
         getState: () => state,
         updateState(props) {
             for (const key in props) {
                 state[key] = typeof props[key] === 'function' && typeof state[key] === 'function' ?
                     (function(prevFn, currFn) {
                         prevFn = prevFn.bind(state)
-
-                        return function(...args) {
-                            if (currFn.length > args.length) args[currFn.length - 1] = prevFn
-                            return currFn.apply(state, args)
-                        }
+                        layers++
+                        return (...args) => currFn.apply(state, [...args, prevFn])
                     })(state[key], props[key]) : props[key]
             }
         }
-    })
+    }
+}
 
 const api = createApi({
-    // using an example that generates a random number so I can verify the function returns the same cached result
-    generateRandomNumber() {
-        return Math.floor(Math.random() * 9)
+    getId() {
+        return 2
     }
 })
 
 api.updateState({
-    // overrides the method with a different implementation that has access to the older method
-    // here we can extend behavior with things like monitoring or caching without bloating the original method
-    generateRandomNumber(prevFn) {
-        if (!prevFn.cachedResult) prevFn.cachedResult = prevFn()
-        console.log(prevFn.cachedResult)
+    getId(prevFn) {
+        const result = prevFn()
+        console.log(result)
+    }
+})
+
+api.updateState({
+    getId(prevFn) {
+        prevFn()
+        console.log('Number of layered calls:', api.getLayers())
     }
 })
 
 const state = api.getState()
-
-state.generateRandomNumber()
-state.generateRandomNumber()
-state.generateRandomNumber()
-state.generateRandomNumber()
+state.getId()
