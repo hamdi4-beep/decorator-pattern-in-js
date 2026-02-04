@@ -1,19 +1,22 @@
-const createApi = state => {
-    let currentState = state || {}
+const createApi = (initialState = {}) => {
+    let newState
 
     return {
-        getState: () => currentState,
+        getState: () => newState,
         updateState(props) {
             for (const key in props) {
-                currentState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
-                    decorate(currentState[key], props[key]) : props[key]
+                if (typeof initialState[key] === 'function' && typeof props[key] === 'function')
+                    newState = {
+                        ...initialState,
+                        [key]: wrap(initialState[key], props[key])
+                    }
             }
         }
     }
 
-    function decorate(oldFn, newFn) {
-        const oldFnBound = oldFn.bind(currentState)
-        return (...args) => newFn.apply(currentState, args.concat(oldFnBound))
+    function wrap(oldFn, newFn) {
+        const oldFnBound = oldFn.bind(initialState)
+        return (...args) => newFn.apply(initialState, args.concat(oldFnBound))
     }
 }
 
@@ -24,16 +27,16 @@ const api = createApi({
 })
 
 api.updateState({
+    // ensures the original method returns the same cached result
     generateRandomNumber(seed, prevFn) {
-        // ensures the same "random" value is returned for testing purposes
         if (!prevFn.cachedResult) prevFn.cachedResult = prevFn(seed)
-        console.log('Cached result:', prevFn.cachedResult)
+        console.log(prevFn.cachedResult)
     }
 })
 
 const state = api.getState()
 
-// calls the same function four times in a row to verify the cached value is being used
+// calls the method multiple times to verify that the cached result is being used
 state.generateRandomNumber(9)
 state.generateRandomNumber(9)
 state.generateRandomNumber(9)
