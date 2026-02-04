@@ -7,8 +7,8 @@ const createApi = state => {
             for (const key in props) {
                 currentState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
                     (function(prevFn, currFn) {
-                        return (...args) => currFn.apply(state, args.concat(prevFn))
-                    })(currentState[key], props[key]) : props[key]
+                        return (...args) => currFn.apply(currentState, args.concat(prevFn))
+                    })(currentState[key].bind(currentState), props[key]) : props[key]
             }
         }
     }
