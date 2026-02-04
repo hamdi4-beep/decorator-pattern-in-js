@@ -11,9 +11,9 @@ const createApi = state => {
         }
     }
 
-    function decorate(wrapped, fn) {
-        const bound = wrapped.bind(currentState)
-        return (...args) => fn.apply(currentState, args.concat(bound))
+    function decorate(oldFn, newFn) {
+        const oldFnBound = oldFn.bind(currentState)
+        return (...args) => newFn.apply(currentState, args.concat(oldFnBound))
     }
 }
 
@@ -27,7 +27,7 @@ api.updateState({
     generateRandomNumber(seed, prevFn) {
         // ensures the same "random" value is returned for testing purposes
         if (!prevFn.cachedResult) prevFn.cachedResult = prevFn(seed)
-        console.log(prevFn.cachedResult)
+        console.log('Cached result:', prevFn.cachedResult)
     }
 })
 
