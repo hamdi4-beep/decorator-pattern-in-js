@@ -22,18 +22,29 @@ const createApi = (initialState = {}) => {
 
 const api = createApi({
     id: 1,
-    method(msg) {
-        console.log(msg, this.id)
+    method() {
+        console.log(this.id)
     }
 })
+
+// verifies the 'getState' method returns a snapshot of the state at the time it was defined.
+
+const oldState = api.getState()
+console.log(oldState)
 
 api.updateState({
     id: 2,
-    method(msg, prevFn) {
-        prevFn('Invoked from the current method:')
-        console.log(msg, this.id)
+    method(prevFn) {
+        prevFn()
+        console.log(this.id)
     }
 })
 
-const state = api.getState()
-state.method('Invoked after the method was redefined:')
+// verifies the getState method has access to the most current snapshot.
+
+const newState = api.getState()
+console.log(newState)
+
+// calls the method which has access to the previous implementation that holds a reference to the original state object.
+
+newState.method()
