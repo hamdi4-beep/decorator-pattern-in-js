@@ -1,22 +1,27 @@
 const createApi = (initialState = {}) => {
-    let newState
+    let currentState = {
+        ...initialState
+    }
 
     return {
-        getState: () => newState,
+        getState: () => currentState,
         updateState(props) {
-            for (const key in props) {
-                if (typeof initialState[key] === 'function' && typeof props[key] === 'function')
-                    newState = {
-                        ...initialState,
-                        [key]: wrap(initialState[key], props[key])
-                    }
+            const newState = {
+                ...currentState
             }
+
+            for (const key in props) {
+                newState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
+                    wrap(currentState[key], props[key]) : props[key]
+            }
+
+            currentState = newState
         }
     }
 
     function wrap(oldFn, newFn) {
-        const oldFnBound = oldFn.bind(initialState)
-        return (...args) => newFn.apply(initialState, args.concat(oldFnBound))
+        const oldFnBound = oldFn.bind(currentState)
+        return (...args) => newFn.apply(currentState, args.concat(oldFnBound))
     }
 }
 
