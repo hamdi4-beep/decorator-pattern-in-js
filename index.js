@@ -1,19 +1,14 @@
 const createApi = (initialState = {}) => {
-    let currentState = {
-        ...initialState
-    }
+    let currentState = {...initialState}
 
     return {
         getState: () => currentState,
         updateState(props) {
-            const newState = {
-                ...currentState
-            }
+            const newState = {...currentState}
 
-            for (const key in props) {
+            for (const key in props)
                 newState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
                     wrap(currentState[key], props[key]) : props[key]
-            }
 
             currentState = newState
         }
@@ -26,23 +21,19 @@ const createApi = (initialState = {}) => {
 }
 
 const api = createApi({
-    generateRandomNumber(seed) {
-        return Math.floor(Math.random() * seed)
+    id: 1,
+    method(msg) {
+        console.log(msg, this.id)
     }
 })
 
 api.updateState({
-    // ensures the original method returns the same cached result
-    generateRandomNumber(seed, prevFn) {
-        if (!prevFn.cachedResult) prevFn.cachedResult = prevFn(seed)
-        console.log(prevFn.cachedResult)
+    id: 2,
+    method(msg, prevFn) {
+        prevFn('Invoked from the current method:')
+        console.log(msg, this.id)
     }
 })
 
 const state = api.getState()
-
-// calls the method multiple times to verify that the cached result is being used
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
+state.method('Invoked after the method was redefined:')
