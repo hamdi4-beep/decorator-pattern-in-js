@@ -1,9 +1,9 @@
-const createApi = (initialState = {}) => {
+const createPlugin = (initialState = {}) => {
     let currentState = Object.assign({}, initialState)
 
     return {
-        getState: () => currentState,
-        updateState(props) {
+        getSnapshot: () => currentState,
+        extend(props) {
             const newState = Object.assign({}, currentState)
 
             for (const key in props)
@@ -19,43 +19,27 @@ const createApi = (initialState = {}) => {
     }
 }
 
-const api = createApi({
-    expensiveComputation(n) {
-        console.log(`Computing fibonacci(${n})...`)
-        if (n <= 1) return n
-        return this.expensiveComputation(n - 1) + this.expensiveComputation(n - 2)
+const plugin = createPlugin({
+    run() {
+        console.log('The plugin is up and running!')
     }
 })
 
-// Layer 1: Performance monitoring
-api.updateState({
-    expensiveComputation(n, prevFn) {
-        const start = performance.now()
-        const result = prevFn(n)
-        const duration = performance.now() - start
-        console.log(`⏱️  Took ${duration.toFixed(2)}ms`)
-        return result
-    }
+plugin.extend({
+    run(prev) {
+        if (this.authenticated)
+            return prev()
+
+        console.log('The plugin is not authenticated yet!')
+    },
+    authenticate(token) {
+        this.authenticated = this.secret === token
+    },
+    secret: 'secret_token'
 })
 
-// Layer 2: Caching
-api.updateState({
-    cache: {},
-    expensiveComputation(n, prevFn) {
-        const cacheKey = `fib-${n}`
-        
-        if (this.cache[cacheKey]) {
-            console.log(`💾 Cache hit for ${n}`)
-            return this.cache[cacheKey]
-        }
-        
-        console.log(`🔍 Cache miss for ${n}`)
-        const result = prevFn(n)
-        this.cache[cacheKey] = result
-        return result
-    }
-})
+const snapshot = plugin.getSnapshot()
+snapshot.run() // won't run because the plugin is not yet authenticated (simulated)
 
-const state = api.getState()
-state.expensiveComputation(10)  // Computes and times
-state.expensiveComputation(10)  // Returns from cache
+snapshot.authenticate('secret_token')
+snapshot.run()

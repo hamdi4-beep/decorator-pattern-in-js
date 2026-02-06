@@ -1,54 +1,530 @@
-# Composable State API
+# createPlugin
 
-A lightweight API pattern that enables function composition with state snapshots, inspired by linked list data structures.
+A lightweight plugin system for building extensible JavaScript applications through function composition.
 
 ## Core Concept
 
-This API allows you to redefine methods while maintaining access to their previous implementations. Each redefined method receives a reference to the previous version and operates with a snapshot of the state at the time it was defined.
+`createPlugin` enables you to build applications where behavior can be extended without modifying core logic. Each extension wraps previous implementations, creating a composable chain of functionality.
 
-**Key Benefits:**
-- Compose new behavior without affecting original implementations
-- Each method layer maintains its own state snapshot
-- Clean interface - no decorators or explicit wrappers needed
-- Traverse backwards through implementation history automatically
+```javascript
+const plugin = createPlugin({
+    process(data) {
+        return data
+    }
+})
+
+// Extend behavior - previous implementation passed as last argument
+plugin.extend({
+    process(data, prev) {
+        const result = prev(data)
+        return result.toUpperCase()
+    }
+})
+
+plugin.getSnapshot().process('hello') // 'HELLO'
+```
+
+## API
+
+### `createPlugin(initialState)`
+
+Creates a new plugin instance with initial behavior and configuration.
+
+**Parameters:**
+- `initialState` (Object): Initial methods and properties
+
+**Returns:** Plugin instance with `extend()` and `getSnapshot()` methods
+
+### `plugin.extend(extensions)`
+
+Adds new behavior to the plugin. Functions are composed with previous implementations; properties are updated.
+
+**Parameters:**
+- `extensions` (Object): New methods and properties to add
+
+**Function Composition:**
+When extending a function, the previous implementation is passed as the last argument:
+
+```javascript
+plugin.extend({
+    method(arg1, arg2, previousImplementation) {
+        // Call previous implementation when needed
+        const result = previousImplementation(arg1, arg2)
+        return result
+    }
+})
+```
+
+### `plugin.getSnapshot()`
+
+Returns the current state of the plugin with all extended behavior.
+
+**Returns:** Object containing all methods and properties
+
+## Examples
+
+### Authentication Guard
+
+```javascript
+const plugin = createPlugin({
+    run() {
+        console.log('The plugin is up and running!')
+    }
+})
+
+plugin.extend({
+    run(prev) {
+        if (this.authenticated)
+            return prev()
+
+        console.log('The plugin is not authenticated yet!')
+    },
+    authenticate(token) {
+        this.authenticated = this.secret === token
+    },
+    secret: 'secret_token'
+})
+
+const snapshot = plugin.getSnapshot()
+snapshot.run() // 'The plugin is not authenticated yet!'
+
+snapshot.authenticate('secret_token')
+snapshot.run() // 'The plugin is up and running!'
+```
+
+### HTTP Client with Interceptors
+
+```javascript
+const http = createPlugin({
+    async request(url, options = {}) {
+        const response = await fetch(url, options)
+        return response.json()
+    }
+})
+
+// Add authentication
+http.extend({
+    async request(url, options, prev) {
+        const authenticatedOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${this.token}`
+            }
+        }
+        return prev(url, authenticatedOptions)
+    },
+    token: null,
+    setToken(token) {
+        this.token = token
+    }
+})
+
+// Add retry logic
+http.extend({
+    async request(url, options, prev) {
+        try {
+            return await prev(url, options)
+        } catch (error) {
+            console.log('Request failed, retrying...')
+            return await prev(url, options)
+        }
+    }
+})
+
+// Add response caching
+http.extend({
+    async request(url, options, prev) {
+        const cacheKey = `${url}-${JSON.stringify(options)}`
+        
+        if (this.cache.has(cacheKey)) {
+            console.log('Cache hit!')
+            return this.cache.get(cacheKey)
+        }
+        
+        const result = await prev(url, options)
+        this.cache.set(cacheKey, result)
+        return result
+    },
+    cache: new Map()
+})
+
+const client = http.getSnapshot()
+client.setToken('abc123')
+
+await client.request('https://api.example.com/data')
+```
+
+### Logger with Contextual Information
+
+```javascript
+const logger = createPlugin({
+    log(message) {
+        console.log(message)
+    }
+})
+
+// Add timestamp
+logger.extend({
+    log(message, prev) {
+        const timestamp = new Date().toISOString()
+        prev(`[${timestamp}] ${message}`)
+    }
+})
+
+// Add log levels
+logger.extend({
+    log(message, prev) {
+        const level = this.level || 'INFO'
+        prev(`[${level}] ${message}`)
+    },
+    level: 'INFO',
+    setLevel(level) {
+        this.level = level
+    }
+})
+
+// Add user context
+logger.extend({
+    log(message, prev) {
+        if (this.userId) {
+            prev(`[User:${this.userId}] ${message}`)
+        } else {
+            prev(message)
+        }
+    },
+    userId: null,
+    setUser(userId) {
+        this.userId = userId
+    }
+})
+
+const log = logger.getSnapshot()
+log.setLevel('DEBUG')
+log.setUser('admin')
+log.log('Application started')
+// [User:admin] [DEBUG] [2024-02-06T...] Application started
+```
+
+### Validation Pipeline
+
+```javascript
+const validator = createPlugin({
+    validate(data) {
+        return { valid: true, errors: [] }
+    }
+})
+
+// Required fields
+validator.extend({
+    validate(data, prev) {
+        const result = prev(data)
+        
+        this.requiredFields.forEach(field => {
+            if (!data[field]) {
+                result.valid = false
+                result.errors.push(`${field} is required`)
+            }
+        })
+        
+        return result
+    },
+    requiredFields: ['email', 'password']
+})
+
+// Email format
+validator.extend({
+    validate(data, prev) {
+        const result = prev(data)
+        
+        if (data.email && !this.emailRegex.test(data.email)) {
+            result.valid = false
+            result.errors.push('Invalid email format')
+        }
+        
+        return result
+    },
+    emailRegex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+})
+
+// Password strength
+validator.extend({
+    validate(data, prev) {
+        const result = prev(data)
+        
+        if (data.password && data.password.length < this.minPasswordLength) {
+            result.valid = false
+            result.errors.push(`Password must be at least ${this.minPasswordLength} characters`)
+        }
+        
+        return result
+    },
+    minPasswordLength: 8
+})
+
+const validate = validator.getSnapshot()
+
+console.log(validate.validate({ email: 'invalid', password: '123' }))
+// {
+//   valid: false,
+//   errors: [
+//     'Invalid email format',
+//     'Password must be at least 8 characters'
+//   ]
+// }
+```
+
+### Event System with Middleware
+
+```javascript
+const events = createPlugin({
+    emit(eventName, data) {
+        console.log(`Event: ${eventName}`, data)
+    }
+})
+
+// Add event filtering
+events.extend({
+    emit(eventName, data, prev) {
+        if (this.allowedEvents.includes(eventName)) {
+            prev(eventName, data)
+        } else {
+            console.log(`Event ${eventName} is not allowed`)
+        }
+    },
+    allowedEvents: ['user:login', 'user:logout', 'data:update']
+})
+
+// Add event logging
+events.extend({
+    emit(eventName, data, prev) {
+        this.eventLog.push({
+            event: eventName,
+            data,
+            timestamp: Date.now()
+        })
+        prev(eventName, data)
+    },
+    eventLog: [],
+    getLog() {
+        return this.eventLog
+    }
+})
+
+// Add rate limiting
+events.extend({
+    emit(eventName, data, prev) {
+        const now = Date.now()
+        const recentEvents = this.recentEvents.filter(
+            time => now - time < this.rateLimitWindow
+        )
+        
+        if (recentEvents.length >= this.rateLimitMax) {
+            console.log('Rate limit exceeded')
+            return
+        }
+        
+        this.recentEvents = [...recentEvents, now]
+        prev(eventName, data)
+    },
+    recentEvents: [],
+    rateLimitWindow: 1000, // 1 second
+    rateLimitMax: 5
+})
+
+const eventEmitter = events.getSnapshot()
+eventEmitter.emit('user:login', { userId: 123 })
+eventEmitter.emit('invalid:event', {}) // 'Event invalid:event is not allowed'
+```
+
+### Command Processor with Error Handling
+
+```javascript
+const processor = createPlugin({
+    execute(command) {
+        console.log(`Executing: ${command}`)
+        return { success: true, output: `Executed ${command}` }
+    }
+})
+
+// Add performance monitoring
+processor.extend({
+    execute(command, prev) {
+        const start = performance.now()
+        const result = prev(command)
+        const duration = performance.now() - start
+        
+        console.log(`Performance: ${duration.toFixed(2)}ms`)
+        return { ...result, duration }
+    }
+})
+
+// Add error handling
+processor.extend({
+    execute(command, prev) {
+        try {
+            return prev(command)
+        } catch (error) {
+            console.error(`Error executing ${command}:`, error.message)
+            return {
+                success: false,
+                error: error.message
+            }
+        }
+    }
+})
+
+// Add command history
+processor.extend({
+    execute(command, prev) {
+        this.history.push({
+            command,
+            timestamp: Date.now()
+        })
+        return prev(command)
+    },
+    history: [],
+    getHistory() {
+        return this.history
+    }
+})
+
+// Add command whitelist
+processor.extend({
+    execute(command, prev) {
+        if (!this.allowedCommands.includes(command)) {
+            throw new Error(`Command '${command}' is not allowed`)
+        }
+        return prev(command)
+    },
+    allowedCommands: ['start', 'stop', 'restart'],
+    addAllowedCommand(command) {
+        this.allowedCommands.push(command)
+    }
+})
+
+const cmd = processor.getSnapshot()
+cmd.execute('start')
+// Executing: start
+// Performance: 0.15ms
+// { success: true, output: 'Executed start', duration: 0.15 }
+```
+
+## Use Cases
+
+### When to Use
+
+- **Plugin architectures** - Applications that need third-party extensions
+- **Middleware systems** - Request/response pipelines with interceptors
+- **Cross-cutting concerns** - Adding logging, caching, auth, validation without touching core logic
+- **Gradual feature rollout** - Layer new features on top of existing functionality
+- **Testing different behaviors** - Swap implementations without modifying core code
+
+### When Not to Use
+
+- **Simple state management** - Use Redux, Zustand, or plain objects
+- **Reactive updates** - Use MobX, Signals, or Observable patterns
+- **Type-safe environments** - The dynamic composition makes TypeScript inference difficult
+- **Performance-critical hot paths** - Function composition adds call stack overhead
 
 ## How It Works
 
-The API uses closures to create a chain of function references, similar to a linked list:
-
-1. When you call `updateState()` with a new method, it creates a wrapper function
-2. The wrapper captures the current state object in its closure
-3. The previous method implementation is bound to its state snapshot and passed as an argument
-4. Each method can call `prevFn()` to delegate to the previous implementation
+Each time you call `extend()`, functions are wrapped in a new closure:
 
 ```javascript
-const api = createApi({
-    version: 1,
-    method() {
-        console.log(this.version)
-    }
-})
+// Initial
+plugin = { method: fn1 }
 
-api.updateState({
-    version: 2,
-    method(prevFn) {
-        prevFn()  // Calls previous implementation with version: 1
-        console.log(this.version)  // Sees version: 2
+// After first extend
+plugin = { 
+    method: function(...args) {
+        return fn2.apply(newState, args.concat(fn1.bind(oldState)))
     }
-})
+}
 
-api.getState().method()  // Logs: 1, 2
+// After second extend  
+plugin = {
+    method: function(...args) {
+        return fn3.apply(newestState, args.concat(fn2Wrapper.bind(previousState)))
+    }
+}
 ```
 
-## Implementation
+When you call the method, it executes the most recent extension first. That extension decides when (or if) to call the previous implementation.
+
+## Patterns
+
+### Pre-Processing
 
 ```javascript
-const createApi = (initialState = {}) => {
+plugin.extend({
+    method(data, prev) {
+        const sanitized = sanitize(data)
+        return prev(sanitized)
+    }
+})
+```
+
+### Post-Processing
+
+```javascript
+plugin.extend({
+    method(data, prev) {
+        const result = prev(data)
+        return enhance(result)
+    }
+})
+```
+
+### Conditional Execution
+
+```javascript
+plugin.extend({
+    method(data, prev) {
+        if (shouldExecute(data)) {
+            return prev(data)
+        }
+        return null
+    }
+})
+```
+
+### Wrap with Try-Catch
+
+```javascript
+plugin.extend({
+    method(data, prev) {
+        try {
+            return prev(data)
+        } catch (error) {
+            return handleError(error)
+        }
+    }
+})
+```
+
+### Skip Previous Implementation
+
+```javascript
+plugin.extend({
+    method(data, prev) {
+        // Completely override previous behavior
+        return newImplementation(data)
+    }
+})
+```
+
+## Advanced: Method Chaining
+
+Make `extend()` chainable by returning the plugin instance:
+
+```javascript
+const createPlugin = (initialState = {}) => {
     let currentState = Object.assign({}, initialState)
 
-    return {
-        getState: () => currentState,
-        updateState(props) {
+    const plugin = {
+        getSnapshot: () => currentState,
+        extend(props) {
             const newState = Object.assign({}, currentState)
 
             for (const key in props)
@@ -60,244 +536,25 @@ const createApi = (initialState = {}) => {
                     })(currentState[key].bind(currentState), props[key]) : props[key]
 
             currentState = newState
+            return plugin  // Enable chaining
         }
     }
+
+    return plugin
 }
+
+// Now you can chain
+createPlugin({ process: x => x })
+    .extend({ process: (x, prev) => prev(x).toUpperCase() })
+    .extend({ process: (x, prev) => prev(x) + '!' })
+    .getSnapshot()
+    .process('hello') // 'HELLO!'
 ```
 
-## Use Cases
+## License
 
-### 1. Retry Logic
+MIT
 
-Add retry functionality to any method without modifying its original implementation:
+## Contributing
 
-```javascript
-const api = createApi({
-    retries: 0,
-    fetchUser(id) {
-        console.log(`Fetching user ${id}...`)
-        if (Math.random() > 0.7) {
-            return { id, name: 'John Doe' }
-        }
-        throw new Error('Network error')
-    }
-})
-
-api.updateState({
-    retries: 3,
-    fetchUser(id, prevFn) {
-        let attempts = 0
-        while (attempts < this.retries) {
-            try {
-                console.log(`Attempt ${attempts + 1}/${this.retries}`)
-                return prevFn(id)
-            } catch (error) {
-                attempts++
-                if (attempts >= this.retries) throw error
-                console.log('Retrying...')
-            }
-        }
-    }
-})
-
-const user = api.getState().fetchUser(123)
-```
-
-### 2. Performance Monitoring + Caching
-
-Layer multiple concerns on top of each other - each layer adds its own behavior:
-
-```javascript
-const api = createApi({
-    expensiveComputation(n) {
-        console.log(`Computing fibonacci(${n})...`)
-        if (n <= 1) return n
-        return this.expensiveComputation(n - 1) + this.expensiveComputation(n - 2)
-    }
-})
-
-// Layer 1: Performance monitoring
-api.updateState({
-    expensiveComputation(n, prevFn) {
-        const start = performance.now()
-        const result = prevFn(n)
-        const duration = performance.now() - start
-        console.log(`⏱️  Took ${duration.toFixed(2)}ms`)
-        return result
-    }
-})
-
-// Layer 2: Caching
-api.updateState({
-    cache: {},
-    expensiveComputation(n, prevFn) {
-        const cacheKey = `fib-${n}`
-        
-        if (this.cache[cacheKey]) {
-            console.log(`💾 Cache hit for ${n}`)
-            return this.cache[cacheKey]
-        }
-        
-        console.log(`🔍 Cache miss for ${n}`)
-        const result = prevFn(n)
-        this.cache[cacheKey] = result
-        return result
-    }
-})
-
-const state = api.getState()
-state.expensiveComputation(10)  // Computes and times
-state.expensiveComputation(10)  // Returns from cache
-```
-
-### 3. Feature Flags / A/B Testing
-
-Conditionally enable new behavior while maintaining the ability to fall back:
-
-```javascript
-const api = createApi({
-    enabled: false,
-    calculateDiscount(price) {
-        return price * 0.1  // 10% discount
-    }
-})
-
-api.updateState({
-    enabled: true,
-    calculateDiscount(price, prevFn) {
-        if (!this.enabled) {
-            console.log('Feature disabled, using old logic')
-            return prevFn(price)
-        }
-        
-        console.log('Feature enabled, using new logic')
-        return price * 0.2  // 20% discount
-    }
-})
-
-api.updateState({
-    isPremium: false,
-    calculateDiscount(price, prevFn) {
-        if (this.isPremium) {
-            console.log('Premium user - extra 5%')
-            return prevFn(price) + (price * 0.05)
-        }
-        return prevFn(price)
-    }
-})
-
-const state = api.getState()
-state.calculateDiscount(100)  // Applies both layers
-```
-
-### 4. Validation & Audit Logging Pipeline
-
-Build processing pipelines where each layer adds validation, logging, or transformation:
-
-```javascript
-const api = createApi({
-    createUser(userData) {
-        return { ...userData, id: Math.random() }
-    }
-})
-
-// Layer 1: Validation
-api.updateState({
-    createUser(userData, prevFn) {
-        console.log('🔍 Validating input...')
-        
-        if (!userData.email || !userData.email.includes('@')) {
-            throw new Error('Invalid email')
-        }
-        
-        if (!userData.name || userData.name.length < 2) {
-            throw new Error('Invalid name')
-        }
-        
-        console.log('✅ Validation passed')
-        return prevFn(userData)
-    }
-})
-
-// Layer 2: Audit logging
-api.updateState({
-    auditLog: [],
-    createUser(userData, prevFn) {
-        const timestamp = new Date().toISOString()
-        console.log(`📝 Logging user creation at ${timestamp}`)
-        
-        const result = prevFn(userData)
-        
-        this.auditLog.push({
-            action: 'createUser',
-            timestamp,
-            userId: result.id
-        })
-        
-        return result
-    }
-})
-
-const state = api.getState()
-const user = state.createUser({ email: 'test@example.com', name: 'Jane' })
-console.log('Audit log:', state.auditLog)
-```
-
-### 5. Rate Limiting
-
-Control method invocation frequency without changing core logic:
-
-```javascript
-const api = createApi({
-    sendEmail(to, message) {
-        console.log(`📧 Sending email to ${to}: "${message}"`)
-        return { sent: true, to }
-    }
-})
-
-api.updateState({
-    lastCallTime: 0,
-    minInterval: 2000,  // 2 seconds between calls
-    sendEmail(to, message, prevFn) {
-        const now = Date.now()
-        const timeSinceLastCall = now - this.lastCallTime
-        
-        if (timeSinceLastCall < this.minInterval) {
-            const waitTime = this.minInterval - timeSinceLastCall
-            console.log(`⏸️  Rate limit: wait ${waitTime}ms`)
-            throw new Error(`Rate limited. Try again in ${waitTime}ms`)
-        }
-        
-        this.lastCallTime = now
-        return prevFn(to, message)
-    }
-})
-
-const state = api.getState()
-state.sendEmail('user@example.com', 'Hello!')
-state.sendEmail('user@example.com', 'Another one!')  // Rate limited
-```
-
-## Technical Details
-
-**State Management:**
-- Each `updateState()` call creates a new state object
-- Method wrappers close over their state object at creation time
-- Previous methods are bound to their respective state snapshots
-- This creates immutable history while allowing forward evolution
-
-**Function Chaining:**
-- Works like a linked list: each node (method) references the previous one
-- Traversal happens automatically when you call the latest method
-- Each layer can choose whether to call `prevFn()` and when
-
-**Performance Considerations:**
-- Each layer adds one function call to the chain
-- State objects are shallow copied on each update
-- Long chains may impact performance for frequently-called methods
-
-## Limitations
-
-- Currently synchronous - async method chaining would require modifications
-- Deep chains could impact performance
-- State snapshots are shallow copies (nested objects share references)
+Contributions welcome! Please open an issue or PR.
