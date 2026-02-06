@@ -8,9 +8,9 @@ const createApi = (initialState = {}) => {
 
             for (const key in props)
                 newState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
-                    (function(prevFn, newFn) {
+                    (function(oldFn, newFn) {
                         return function(...args) {
-                            return newFn.apply(currentState, args.concat(prevFn))
+                            return newFn.apply(newState, args.concat(oldFn))
                         }
                     })(currentState[key].bind(currentState), props[key]) : props[key]
 
@@ -20,23 +20,27 @@ const createApi = (initialState = {}) => {
 }
 
 const api = createApi({
-    generateRandomNumber(seed) {
-        return Math.floor(Math.random() * seed)
+    version: 1,
+    method() {
+        console.log(this.version)
     }
 })
 
-const snapshot1 = api.getState()
+api.updateState({
+    version: 2,
+    method(prevFn) {
+        prevFn()
+        console.log(this.version)
+    }
+})
 
 api.updateState({
-    generateRandomNumber(seed, prevFn) {
-        if (!prevFn.cachedResult) prevFn.cachedResult = prevFn(seed)
-        console.log(prevFn.cachedResult)
+    version: 3,
+    method(prevFn) {
+        prevFn()
+        console.log(this.version)
     }
 })
 
 const state = api.getState()
-
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
-state.generateRandomNumber(9)
+state.method()
