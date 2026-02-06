@@ -1,7 +1,7 @@
 const createPlugin = (initialState = {}) => {
     let currentState = Object.assign({}, initialState)
 
-    return {
+    const plugin = {
         getSnapshot: () => currentState,
         extend(props) {
             const newState = Object.assign({}, currentState)
@@ -15,8 +15,12 @@ const createPlugin = (initialState = {}) => {
                     })(currentState[key].bind(currentState), props[key]) : props[key]
 
             currentState = newState
+
+            return plugin
         }
     }
+
+    return plugin
 }
 
 const plugin = createPlugin({
@@ -27,9 +31,7 @@ const plugin = createPlugin({
 
 plugin.extend({
     run(prev) {
-        if (this.authenticated)
-            return prev()
-
+        if (this.authenticated) return prev()
         console.log('The plugin is not authenticated yet!')
     },
     authenticate(token) {
@@ -39,7 +41,7 @@ plugin.extend({
 })
 
 const snapshot = plugin.getSnapshot()
-snapshot.run() // won't run because the plugin is not yet authenticated (simulated)
 
+snapshot.run() // won't run because the plugin is not yet authenticated (simulated)
 snapshot.authenticate('secret_token')
 snapshot.run()
