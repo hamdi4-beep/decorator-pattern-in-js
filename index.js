@@ -1,7 +1,7 @@
-const createPlugin = (initialState = {}) => {
+const createApi = (initialState = {}) => {
     let currentState = Object.assign({}, initialState)
 
-    const plugin = {
+    return {
         getSnapshot: () => currentState,
         extend(props) {
             const newState = Object.assign({}, currentState)
@@ -15,33 +15,32 @@ const createPlugin = (initialState = {}) => {
                     })(currentState[key].bind(currentState), props[key]) : props[key]
 
             currentState = newState
-
-            return plugin
         }
     }
-
-    return plugin
 }
 
-const plugin = createPlugin({
-    run() {
-        console.log('The plugin is up and running!')
+const api = createApi({
+    id: 1,
+    method() {
+        console.log(this.id)
     }
 })
 
-plugin.extend({
-    run(prev) {
-        if (this.authenticated) return prev()
-        console.log('The plugin is not authenticated yet!')
-    },
-    authenticate(token) {
-        this.authenticated = this.secret === token
-    },
-    secret: 'secret_token'
+api.extend({
+    id: 2,
+    method(prev) {
+        prev()
+        console.log(this.id)
+    }
 })
 
-const snapshot = plugin.getSnapshot()
+api.extend({
+    id: 3,
+    method(prev) {
+        prev()
+        console.log(this.id)
+    }
+})
 
-snapshot.run() // won't run because the plugin is not yet authenticated (simulated)
-snapshot.authenticate('secret_token')
-snapshot.run()
+const snapshot = api.getSnapshot()
+snapshot.method()
