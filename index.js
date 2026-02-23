@@ -1,44 +1,39 @@
-const createApi = (initialState = {}) => {
-    let currentState = Object.assign({}, initialState)
+const createApi = () => {
+    let currentState = {}
 
     return {
         getSnapshot: () => currentState,
-        extend(props) {
-            const newState = Object.assign({}, currentState)
+        compose(props) {
+            const newState = {...currentState}
 
-            for (const key in props)
+            for (const key in props) {
                 newState[key] = typeof currentState[key] === 'function' && typeof props[key] === 'function' ?
                     (function(oldFn, newFn) {
                         return function(...args) {
                             return newFn.apply(newState, args.concat(oldFn))
                         }
                     })(currentState[key].bind(currentState), props[key]) : props[key]
+            }
 
             currentState = newState
         }
     }
 }
 
-const api = createApi({
-    id: 1,
+const api = createApi()
+
+api.compose({
+    version: 1,
     method() {
-        console.log(this.id)
+        console.log(this.version)
     }
 })
 
-api.extend({
-    id: 2,
+api.compose({
+    version: 2,
     method(prev) {
         prev()
-        console.log(this.id)
-    }
-})
-
-api.extend({
-    id: 3,
-    method(prev) {
-        prev()
-        console.log(this.id)
+        console.log(this.version)
     }
 })
 
